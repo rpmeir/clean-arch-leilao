@@ -1,0 +1,9 @@
+{
+    "require-dev": {
+        "phpunit/phpunit": "^12.1",
+        "phpstan/phpstan": "^2.1"
+    },
+    "scripts": {
+        "lint" : "vendor/bin/phpstan analyse src tests --level 1"
+    }
+}
