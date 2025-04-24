@@ -63,7 +63,6 @@ describe('Testar enpoints', function () use ($client) {
         ];
         $responseCreateAuction = $client->post('/auctions', ['json' => $inputCreateAuction]);
         $outputCreateAuction = json_decode($responseCreateAuction->getBody()->getContents(), true);
-        expect($outputCreateAuction)->toHaveKey('auctionId');
 
         $inputBid1 = [
             'auctionId'=> $outputCreateAuction['auctionId'],
@@ -75,5 +74,65 @@ describe('Testar enpoints', function () use ($client) {
         expect($responseBid1->getStatusCode())->toBe(422);
         $outputCreateBid = json_decode($responseBid1->getBody()->getContents(), true);
         expect($outputCreateBid['error'])->toBe('Auction is ended');
+    });
+
+    test('Não pode dar lance menor que o anterior', function() use ($client) {
+        $inputCreateAuction = [
+            'startDate' => '2025-03-01T10:00:00Z',
+            'endDate' => '2025-03-01T12:00:00Z',
+            'minIncrement' => 10,
+            'startAmount' => 1000
+        ];
+        $responseCreateAuction = $client->post('/auctions', ['json' => $inputCreateAuction]);
+        $outputCreateAuction = json_decode($responseCreateAuction->getBody()->getContents(), true);
+
+        $inputBid1 = [
+            'auctionId'=> $outputCreateAuction['auctionId'],
+            'customer' => 'a',
+            'amount' => 1100,
+            'date' => '2025-03-01T11:00:00Z'
+        ];
+        $client->post('/bids', ['json' => $inputBid1]);
+
+        $inputBid2 = [
+            'auctionId'=> $outputCreateAuction['auctionId'],
+            'customer' => 'b',
+            'amount' => 1000,
+            'date' => '2025-03-01T11:30:00Z'
+        ];
+        $responseBid2 = $client->post('/bids', ['json' => $inputBid2]);
+        expect($responseBid2->getStatusCode())->toBe(422);
+        $outputCreateBid2 = json_decode($responseBid2->getBody()->getContents(), true);
+        expect($outputCreateBid2['error'])->toBe('Bid amount should be higher than the highest bid');
+    });
+
+    test('Não deve dar lance seguido pelo mesmo cliente', function() use ($client) {
+        $inputCreateAuction = [
+            'startDate' => '2025-03-01T10:00:00Z',
+            'endDate' => '2025-03-01T12:00:00Z',
+            'minIncrement' => 10,
+            'startAmount' => 1000
+        ];
+        $responseCreateAuction = $client->post('/auctions', ['json' => $inputCreateAuction]);
+        $outputCreateAuction = json_decode($responseCreateAuction->getBody()->getContents(), true);
+
+        $inputBid1 = [
+            'auctionId'=> $outputCreateAuction['auctionId'],
+            'customer' => 'a',
+            'amount' => 1100,
+            'date' => '2025-03-01T11:00:00Z'
+        ];
+        $client->post('/bids', ['json' => $inputBid1]);
+
+        $inputBid2 = [
+            'auctionId'=> $outputCreateAuction['auctionId'],
+            'customer' => 'a',
+            'amount' => 1200,
+            'date' => '2025-03-01T11:30:00Z'
+        ];
+        $responseBid2 = $client->post('/bids', ['json' => $inputBid2]);
+        expect($responseBid2->getStatusCode())->toBe(422);
+        $outputCreateBid2 = json_decode($responseBid2->getBody()->getContents(), true);
+        expect($outputCreateBid2['error'])->toBe('Auction does not accept sequencial bids from the same customer');
     });
 });

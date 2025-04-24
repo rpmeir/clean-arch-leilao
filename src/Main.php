@@ -45,6 +45,21 @@ $app->post('/bids', static function (Request $request, Response $response) use (
             ->withStatus(422);
     }
 
+    $statement = $connection->prepare('SELECT * FROM leilao.bid WHERE auction_id = :auctionId ORDER BY amount DESC LIMIT 1;');
+    $statement->execute(['auctionId' => $auctionData['auction_id']]);
+    [$highestBid] = $statement->fetchAll(PDO::FETCH_ASSOC);
+    if ($highestBid && $highestBid['amount'] > $bid['amount'] ) {
+        $response->getBody()->write(json_encode(['error' => 'Bid amount should be higher than the highest bid']));
+        return $response
+            ->withHeader('Content-Type', 'application/json')
+            ->withStatus(422);
+    }
+    if ($highestBid && $highestBid['customer'] == $bid['customer'] ) {
+        $response->getBody()->write(json_encode(['error' => 'Auction does not accept sequencial bids from the same customer']));
+        return $response
+            ->withHeader('Content-Type', 'application/json')
+            ->withStatus(422);
+    }
     $statement = $connection->prepare('INSERT INTO leilao.bid (bid_id, auction_id, customer, amount, date) VALUES (:bidId, :auctionId, :customer, :amount, :date);');
     $statement->execute($bid);
 
@@ -62,6 +77,7 @@ $app->get('/auctions/{auctionId}', static function (Request $request, Response $
         $response->withStatus(404, 'Auction not found');
         return $response->withHeader('Content-Type', 'application/json');
     }
+
     $statement = $connection->prepare('SELECT * FROM leilao.bid WHERE auction_id = :auctionId ORDER BY amount DESC LIMIT 1;');
     $statement->execute(['auctionId' => $auctionId]);
     [$bidData] = $statement->fetchAll(PDO::FETCH_ASSOC);
